@@ -26,7 +26,6 @@ impl Render for HelloWorld {
             .child(
                 div()
                     .flex()
-                    .flex_col()
                     .gap_2()
                     .child(div().size_8().bg(gpui::red()))
                     .child(div().size_8().bg(gpui::green()))

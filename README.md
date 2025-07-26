@@ -4,20 +4,21 @@ A fast, lightweight, and native desktop HTTP client built in Rust with [GPUI](ht
 
 ## Status
 
-> **v0.1 — Layout shell**
-> The 3-panel UI skeleton is in place. Network and storage layers are stubbed out and will be implemented in upcoming iterations.
+> **v0.3 — Headers editor**
+> 3-panel shell, method selector, URL input, and headers key-value editor are functional. Network and storage layers are next.
 
 ## Architecture
 
 ```
 src/
-├── main.rs              # Entry point — opens the window and wires modules
+├── main.rs                       # Entry point — opens the window and wires modules
 ├── ui_module/
-│   └── mod.rs           # GPUI components: layout, panels, buttons, inputs
+│   ├── mod.rs                    # AppView: 3-panel shell, request bar, method selector
+│   └── headers_editor.rs         # HeadersEditor sub-view (key-value pairs)
 ├── network_module/
-│   └── mod.rs           # HTTP execution layer (reqwest) — TODO
+│   └── mod.rs                    # HTTP execution layer (reqwest) — TODO
 └── storage_module/
-    └── mod.rs           # File-based collection persistence — TODO
+    └── mod.rs                    # File-based collection persistence — TODO
 ```
 
 ### Module responsibilities
@@ -44,8 +45,8 @@ src/
 ## Goals (v1)
 
 - [x] 3-panel layout shell
-- [ ] URL input + HTTP method selector (GET, POST, PUT, DELETE)
-- [ ] Headers editor (key-value pairs)
+- [x] URL input + HTTP method selector (GET, POST, PUT, DELETE)
+- [x] Headers editor (key-value pairs, add/remove rows)
 - [ ] JSON body textarea
 - [ ] Async request execution and response display
 - [ ] Save/load requests from local files

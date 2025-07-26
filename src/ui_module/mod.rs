@@ -1,11 +1,15 @@
-use gpui::{div, prelude::*, px, rgb, ClickEvent, Context, Entity, Window};
+mod headers_editor;
+
+use gpui::{ClickEvent, Context, Entity, Window, div, prelude::*, px, rgb};
 use gpui_component::{
     Selectable,
     button::{Button, ButtonVariants},
     input::{Input, InputState},
 };
 
-// ── HTTP method ──────────────────────────────────────────────────────────────
+use headers_editor::HeadersEditor;
+
+// ── HTTP method ───────────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum HttpMethod {
@@ -26,11 +30,12 @@ impl HttpMethod {
     }
 }
 
-// ── AppView ──────────────────────────────────────────────────────────────────
+// ── AppView ───────────────────────────────────────────────────────────────────
 
 pub struct AppView {
     method: HttpMethod,
     url_input: Entity<InputState>,
+    headers_editor: Entity<HeadersEditor>,
 }
 
 impl AppView {
@@ -38,17 +43,18 @@ impl AppView {
         let url_input = cx.new(|cx| {
             InputState::new(window, cx).placeholder("https://api.example.com/resource")
         });
+        let headers_editor = cx.new(|cx| HeadersEditor::new(window, cx));
         Self {
             method: HttpMethod::Get,
             url_input,
+            headers_editor,
         }
     }
 }
 
 impl Render for AppView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Pre-create all click listeners before starting the builder chain,
-        // so we don't borrow `cx` and `self` simultaneously.
+        // Pre-create all click listeners before the builder chain.
         let method = self.method;
 
         let on_get = cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -69,7 +75,11 @@ impl Render for AppView {
         });
         let on_send = cx.listener(|this, _: &ClickEvent, _, cx| {
             let url = this.url_input.read(cx).value();
+            let headers = this.headers_editor.read(cx).headers(cx);
             println!("[Makako] {} {}", this.method.label(), url);
+            for (k, v) in &headers {
+                println!("  {}: {}", k, v);
+            }
         });
 
         div()
@@ -95,7 +105,7 @@ impl Render for AppView {
                     .flex()
                     .flex_col()
                     .bg(rgb(0x24243e))
-                    // Request bar ─────────────────────────────────
+                    // Request bar
                     .child(
                         div()
                             .flex()
@@ -104,7 +114,6 @@ impl Render for AppView {
                             .gap_2()
                             .p_3()
                             .bg(rgb(0x1e1e32))
-                            // Method selector
                             .child(
                                 div()
                                     .flex()
@@ -139,18 +148,41 @@ impl Render for AppView {
                                             .on_click(on_delete),
                                     ),
                             )
-                            // URL input
                             .child(div().flex_1().child(Input::new(&self.url_input)))
-                            // Send button
-                            .child(Button::new("btn-send").label("Send").primary().on_click(on_send)),
+                            .child(
+                                Button::new("btn-send")
+                                    .label("Send")
+                                    .primary()
+                                    .on_click(on_send),
+                            ),
                     )
-                    // Body / Headers placeholder ───────────────────
+                    // Headers section
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .border_b_1()
+                            .border_color(rgb(0x2e2e4a))
+                            // Section label
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_2()
+                                    .text_sm()
+                                    .text_color(rgb(0x7777aa))
+                                    .child("Headers"),
+                            )
+                            .child(self.headers_editor.clone()),
+                    )
+                    // Body placeholder (next iteration)
                     .child(
                         div()
                             .flex_1()
-                            .p_4()
-                            .text_color(rgb(0x666688))
-                            .child("Headers · Body"),
+                            .px_3()
+                            .py_2()
+                            .text_sm()
+                            .text_color(rgb(0x444466))
+                            .child("Body"),
                     ),
             )
             // ── Response panel ────────────────────────────────────

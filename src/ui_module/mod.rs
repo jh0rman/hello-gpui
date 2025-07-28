@@ -1,4 +1,5 @@
 mod headers_editor;
+mod response_panel;
 
 use gpui::{ClickEvent, Context, Entity, Window, div, prelude::*, px, rgb};
 use gpui_component::{
@@ -7,7 +8,9 @@ use gpui_component::{
     input::{Input, InputState},
 };
 
+use crate::network_module::{self, HttpRequest};
 use headers_editor::HeadersEditor;
+use response_panel::ResponsePanel;
 
 // ── HTTP method ───────────────────────────────────────────────────────────────
 
@@ -37,6 +40,7 @@ pub struct AppView {
     url_input: Entity<InputState>,
     headers_editor: Entity<HeadersEditor>,
     body_input: Entity<InputState>,
+    response_panel: Entity<ResponsePanel>,
 }
 
 impl AppView {
@@ -50,11 +54,13 @@ impl AppView {
                 .code_editor("json")
                 .placeholder("// JSON request body")
         });
+        let response_panel = cx.new(|_cx| ResponsePanel::new());
         Self {
             method: HttpMethod::Get,
             url_input,
             headers_editor,
             body_input,
+            response_panel,
         }
     }
 }
@@ -80,17 +86,54 @@ impl Render for AppView {
             this.method = HttpMethod::Delete;
             cx.notify();
         });
+
         let on_send = cx.listener(|this, _: &ClickEvent, _, cx| {
-            let url = this.url_input.read(cx).value();
+            let url = this.url_input.read(cx).value().to_string();
+            let method = this.method.label().to_string();
             let headers = this.headers_editor.read(cx).headers(cx);
-            let body = this.body_input.read(cx).value();
-            println!("[Makako] {} {}", this.method.label(), url);
-            for (k, v) in &headers {
-                println!("  {}: {}", k, v);
-            }
-            if !body.trim().is_empty() {
-                println!("  body: {}", body);
-            }
+            let body = {
+                let b = this.body_input.read(cx).value().to_string();
+                if b.trim().is_empty() { None } else { Some(b) }
+            };
+
+            let req = HttpRequest { method, url, headers, body };
+
+            // Mark the panel as loading.
+            this.response_panel.update(cx, |panel, cx| {
+                panel.loading = true;
+                panel.response = None;
+                panel.error = None;
+                cx.notify();
+            });
+
+            // Spawn async task: bridge blocking reqwest via oneshot channel.
+            cx.spawn(async move |view, async_cx| {
+                let (tx, rx) = futures::channel::oneshot::channel();
+                std::thread::spawn(move || {
+                    let _ = tx.send(network_module::execute(req));
+                });
+
+                let result = rx.await.unwrap_or_else(|_| Err("thread panicked".to_string()));
+
+                view.update(async_cx, |this, cx| {
+                    this.response_panel.update(cx, |panel, cx| {
+                        panel.loading = false;
+                        match result {
+                            Ok(resp) => {
+                                panel.response = Some(resp);
+                                panel.error = None;
+                            }
+                            Err(e) => {
+                                panel.error = Some(e);
+                                panel.response = None;
+                            }
+                        }
+                        cx.notify();
+                    });
+                })
+                .ok();
+            })
+            .detach();
         });
 
         div()
@@ -174,7 +217,6 @@ impl Render for AppView {
                             .flex_col()
                             .border_b_1()
                             .border_color(rgb(0x2e2e4a))
-                            // Section label
                             .child(
                                 div()
                                     .px_3()
@@ -191,7 +233,6 @@ impl Render for AppView {
                             .flex_1()
                             .flex()
                             .flex_col()
-                            // Section label
                             .child(
                                 div()
                                     .px_3()
@@ -200,7 +241,6 @@ impl Render for AppView {
                                     .text_color(rgb(0x7777aa))
                                     .child("Body"),
                             )
-                            // JSON code editor — fills remaining vertical space
                             .child(
                                 div()
                                     .flex_1()
@@ -215,10 +255,7 @@ impl Render for AppView {
                 div()
                     .w(px(420.0))
                     .h_full()
-                    .bg(rgb(0x0f3460))
-                    .p_4()
-                    .text_color(rgb(0x88bbdd))
-                    .child("Respuesta"),
+                    .child(self.response_panel.clone()),
             )
     }
 }

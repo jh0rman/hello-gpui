@@ -4,8 +4,8 @@ A fast, lightweight, and native desktop HTTP client built in Rust with [GPUI](ht
 
 ## Status
 
-> **v0.4 — Request editor complete**
-> Method selector, URL input, headers key-value editor, and JSON body textarea (with syntax highlighting) are functional. Network and storage layers are next.
+> **v0.5 — Async request execution complete**
+> Send button fires a real HTTP request in a background thread. The response panel displays status code, latency (ms), and response body. Storage layer is next.
 
 ## Architecture
 
@@ -14,9 +14,10 @@ src/
 ├── main.rs                       # Entry point — opens the window and wires modules
 ├── ui_module/
 │   ├── mod.rs                    # AppView: 3-panel shell, request bar, method selector
-│   └── headers_editor.rs         # HeadersEditor sub-view (key-value pairs)
+│   ├── headers_editor.rs         # HeadersEditor sub-view (key-value pairs)
+│   └── response_panel.rs         # ResponsePanel sub-view (status, latency, body)
 ├── network_module/
-│   └── mod.rs                    # HTTP execution layer (reqwest) — TODO
+│   └── mod.rs                    # HTTP execution (reqwest blocking + oneshot channel)
 └── storage_module/
     └── mod.rs                    # File-based collection persistence — TODO
 ```
@@ -48,7 +49,7 @@ src/
 - [x] URL input + HTTP method selector (GET, POST, PUT, DELETE)
 - [x] Headers editor (key-value pairs, add/remove rows)
 - [x] JSON body textarea (code editor with syntax highlighting)
-- [ ] Async request execution and response display
+- [x] Async request execution and response display
 - [ ] Save/load requests from local files
 
 ## Non-Goals
@@ -81,3 +82,5 @@ cargo build --release
 | `gpui`            | High-performance native UI framework |
 | `gpui-component`  | Additional GPUI component utilities  |
 | `core-text`       | macOS CoreText bindings              |
+| `reqwest`         | HTTP client (blocking, used in background thread) |
+| `futures`         | `oneshot` channel to bridge thread → async executor |

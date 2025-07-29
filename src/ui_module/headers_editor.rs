@@ -32,6 +32,29 @@ impl HeadersEditor {
         }
     }
 
+    /// Replaces all rows with the given (key, value) pairs.
+    pub fn load_headers(
+        &mut self,
+        pairs: Vec<(String, String)>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.rows = pairs
+            .into_iter()
+            .map(|(k, v)| {
+                let row = HeaderRow::new(window, cx);
+                row.key.update(cx, |s, cx| s.set_value(k, window, cx));
+                row.value.update(cx, |s, cx| s.set_value(v, window, cx));
+                row
+            })
+            .collect();
+
+        if self.rows.is_empty() {
+            self.rows.push(HeaderRow::new(window, cx));
+        }
+        cx.notify();
+    }
+
     /// Returns non-empty (key, value) pairs for use in HTTP requests.
     pub fn headers(&self, cx: &App) -> Vec<(String, String)> {
         self.rows

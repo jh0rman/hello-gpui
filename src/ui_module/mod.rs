@@ -1,7 +1,9 @@
 mod headers_editor;
 mod response_panel;
 
-use gpui::{ClickEvent, Context, Entity, Window, div, prelude::*, px, rgb};
+use std::path::PathBuf;
+
+use gpui::{ClickEvent, Context, Entity, SharedString, Window, div, prelude::*, px, rgb};
 use gpui_component::{
     Selectable,
     button::{Button, ButtonVariants},
@@ -9,6 +11,7 @@ use gpui_component::{
 };
 
 use crate::network_module::{self, HttpRequest};
+use crate::storage_module::{self, SavedRequest};
 use headers_editor::HeadersEditor;
 use response_panel::ResponsePanel;
 
@@ -31,6 +34,15 @@ impl HttpMethod {
             HttpMethod::Delete => "DELETE",
         }
     }
+
+    fn from_str(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "POST" => HttpMethod::Post,
+            "PUT" => HttpMethod::Put,
+            "DELETE" => HttpMethod::Delete,
+            _ => HttpMethod::Get,
+        }
+    }
 }
 
 // ── AppView ───────────────────────────────────────────────────────────────────
@@ -41,6 +53,10 @@ pub struct AppView {
     headers_editor: Entity<HeadersEditor>,
     body_input: Entity<InputState>,
     response_panel: Entity<ResponsePanel>,
+
+    // Sidebar state
+    collection_dir: PathBuf,
+    saved_requests: Vec<(String, PathBuf)>, // (display name, file path)
 }
 
 impl AppView {
@@ -55,21 +71,31 @@ impl AppView {
                 .placeholder("// JSON request body")
         });
         let response_panel = cx.new(|_cx| ResponsePanel::new());
+        let collection_dir = storage_module::default_collection_dir();
+        let saved_requests = storage_module::list_requests(&collection_dir);
+
         Self {
             method: HttpMethod::Get,
             url_input,
             headers_editor,
             body_input,
             response_panel,
+            collection_dir,
+            saved_requests,
         }
+    }
+
+    /// Reloads the sidebar list from disk.
+    fn refresh_sidebar(&mut self) {
+        self.saved_requests = storage_module::list_requests(&self.collection_dir);
     }
 }
 
 impl Render for AppView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Pre-create all click listeners before the builder chain.
         let method = self.method;
 
+        // ── Method listeners ─────────────────────────────────────────────────
         let on_get = cx.listener(|this, _: &ClickEvent, _, cx| {
             this.method = HttpMethod::Get;
             cx.notify();
@@ -87,6 +113,7 @@ impl Render for AppView {
             cx.notify();
         });
 
+        // ── Send ─────────────────────────────────────────────────────────────
         let on_send = cx.listener(|this, _: &ClickEvent, _, cx| {
             let url = this.url_input.read(cx).value().to_string();
             let method = this.method.label().to_string();
@@ -98,7 +125,6 @@ impl Render for AppView {
 
             let req = HttpRequest { method, url, headers, body };
 
-            // Mark the panel as loading.
             this.response_panel.update(cx, |panel, cx| {
                 panel.loading = true;
                 panel.response = None;
@@ -106,7 +132,6 @@ impl Render for AppView {
                 cx.notify();
             });
 
-            // Spawn async task: bridge blocking reqwest via oneshot channel.
             cx.spawn(async move |view, async_cx| {
                 let (tx, rx) = futures::channel::oneshot::channel();
                 std::thread::spawn(move || {
@@ -136,6 +161,57 @@ impl Render for AppView {
             .detach();
         });
 
+        // ── Save ─────────────────────────────────────────────────────────────
+        let on_save = cx.listener(|this, _: &ClickEvent, _, cx| {
+            let url = this.url_input.read(cx).value().to_string();
+            let name = if url.is_empty() {
+                "Untitled".to_string()
+            } else {
+                // Use last path segment of URL as default name.
+                url.trim_end_matches('/')
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or("Untitled")
+                    .to_string()
+            };
+
+            let req = SavedRequest {
+                name,
+                method: this.method.label().to_string(),
+                url,
+                headers: this.headers_editor.read(cx).headers(cx),
+                body: this.body_input.read(cx).value().to_string(),
+            };
+
+            let dir = this.collection_dir.clone();
+            match storage_module::save_request(&dir, &req) {
+                Ok(_) => this.refresh_sidebar(),
+                Err(e) => eprintln!("[Makako] save error: {e}"),
+            }
+            cx.notify();
+        });
+
+        // ── Sidebar load listeners (one per saved request) ───────────────────
+        let load_listeners: Vec<_> = self
+            .saved_requests
+            .iter()
+            .map(|(_, path)| {
+                let path = path.clone();
+                cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    let Ok(req) = storage_module::load_request(&path) else {
+                        return;
+                    };
+                    this.method = HttpMethod::from_str(&req.method);
+                    this.url_input.update(cx, |s, cx| s.set_value(req.url, window, cx));
+                    this.body_input.update(cx, |s, cx| s.set_value(req.body, window, cx));
+                    this.headers_editor
+                        .update(cx, |he, cx| he.load_headers(req.headers, window, cx));
+                    cx.notify();
+                })
+            })
+            .collect();
+
+        // ── Layout ───────────────────────────────────────────────────────────
         div()
             .flex()
             .flex_row()
@@ -146,10 +222,60 @@ impl Render for AppView {
                 div()
                     .w(px(240.0))
                     .h_full()
+                    .flex()
+                    .flex_col()
                     .bg(rgb(0x1a1a2e))
-                    .p_4()
-                    .text_color(rgb(0x8888aa))
-                    .child("Colecciones"),
+                    .p_3()
+                    // Section label
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(gpui::FontWeight::BOLD)
+                            .text_color(rgb(0x555577))
+                            .pb_2()
+                            .child("COLLECTIONS"),
+                    )
+                    // Request list
+                    .children(
+                        self.saved_requests
+                            .iter()
+                            .zip(load_listeners)
+                            .enumerate()
+                            .map(|(i, ((name, _), on_load))| {
+                                div()
+                                    .id(("sidebar-item", i))
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap_2()
+                                    .px_2()
+                                    .py_1()
+                                    .rounded_md()
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(rgb(0x2a2a44)))
+                                    .on_click(on_load)
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(rgb(0x6677aa))
+                                            .child(
+                                                self.saved_requests[i]
+                                                    .0
+                                                    .chars()
+                                                    .take(3)
+                                                    .collect::<String>()
+                                                    .to_uppercase(),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .text_sm()
+                                            .text_color(rgb(0xaaaacc))
+                                            .child(SharedString::from(name.clone())),
+                                    )
+                            }),
+                    ),
             )
             // ── Central editor ────────────────────────────────────
             .child(
@@ -203,6 +329,12 @@ impl Render for AppView {
                                     ),
                             )
                             .child(div().flex_1().child(Input::new(&self.url_input)))
+                            .child(
+                                Button::new("btn-save")
+                                    .label("Save")
+                                    .ghost()
+                                    .on_click(on_save),
+                            )
                             .child(
                                 Button::new("btn-send")
                                     .label("Send")

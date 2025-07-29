@@ -4,8 +4,8 @@ A fast, lightweight, and native desktop HTTP client built in Rust with [GPUI](ht
 
 ## Status
 
-> **v0.5 — Async request execution complete**
-> Send button fires a real HTTP request in a background thread. The response panel displays status code, latency (ms), and response body. Storage layer is next.
+> **v1.0 — Feature complete**
+> All v1 goals met: 3-panel UI, HTTP method selector, headers editor, JSON body with syntax highlighting, async request execution, and save/load from local files.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ src/
 ├── network_module/
 │   └── mod.rs                    # HTTP execution (reqwest blocking + oneshot channel)
 └── storage_module/
-    └── mod.rs                    # File-based collection persistence — TODO
+    └── mod.rs                    # JSON persistence in ~/Documents/Makako/default/
 ```
 
 ### Module responsibilities
@@ -50,7 +50,7 @@ src/
 - [x] Headers editor (key-value pairs, add/remove rows)
 - [x] JSON body textarea (code editor with syntax highlighting)
 - [x] Async request execution and response display
-- [ ] Save/load requests from local files
+- [x] Save/load requests from local files
 
 ## Non-Goals
 
@@ -84,3 +84,5 @@ cargo build --release
 | `core-text`       | macOS CoreText bindings              |
 | `reqwest`         | HTTP client (blocking, used in background thread) |
 | `futures`         | `oneshot` channel to bridge thread → async executor |
+| `serde` / `serde_json` | Serialize/deserialize saved requests as JSON   |
+| `dirs`            | Resolve `~/Documents/` cross-platform                |

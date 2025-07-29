@@ -2493,10 +2493,13 @@ name = "hello_gpui"
 version = "0.1.0"
 dependencies = [
  "core-text",
+ "dirs 5.0.1",
  "futures",
  "gpui",
  "gpui-component",
  "reqwest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -4,8 +4,8 @@ A fast, lightweight, and native desktop HTTP client built in Rust with [GPUI](ht
 
 ## Status
 
-> **v1.0 — Feature complete**
-> All v1 goals met: 3-panel UI, HTTP method selector, headers editor, JSON body with syntax highlighting, async request execution, and save/load from local files.
+> **v2.0 — In progress: Collections & Environments**
+> v1 complete. Now building a real file-explorer sidebar, hierarchical collection tree, and `{{variable}}` interpolation via `env.json`.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ src/
 |------------------|-----------------------------------------------------------------------|
 | `ui_module`      | All GPUI rendering: 3-panel layout, request editor, response viewer   |
 | `network_module` | Async HTTP calls via `reqwest` (GET, POST, PUT, DELETE)               |
-| `storage_module` | Read/write request collections from local `.bru`-style text files     |
+| `storage_module` | Read/write request collections and env files from local filesystem    |
 
 ## UI Layout
 
@@ -36,27 +36,30 @@ src/
 ┌──────────────────────────────────────────────────────────┐
 │  Sidebar (240 px)  │  Request Editor (flex)  │ Response  │
 │                    │                         │ (420 px)  │
-│  Collections &     │  URL · Method · Headers │           │
-│  saved requests    │  Body (JSON)            │  Status   │
-│                    │                         │  Time     │
-│                    │                         │  Body     │
+│  📁 collection/    │  URL · Method · Headers │           │
+│    📄 get-users    │  Body (JSON)            │  Status   │
+│    📄 post-login   │                         │  Time     │
+│  📁 auth/          │  {{base_url}}/endpoint  │  Body     │
+│    📄 refresh      │                         │           │
 └──────────────────────────────────────────────────────────┘
 ```
 
-## Goals (v1)
+## Goals (v2) — In Progress
 
-- [x] 3-panel layout shell
-- [x] URL input + HTTP method selector (GET, POST, PUT, DELETE)
-- [x] Headers editor (key-value pairs, add/remove rows)
-- [x] JSON body textarea (code editor with syntax highlighting)
-- [x] Async request execution and response display
-- [x] Save/load requests from local files
+- [x] Sidebar file-explorer: read `~/Documents/Makako/` as a directory tree
+- [x] Tree node model: `CollectionNode::Folder` / `CollectionNode::Request`
+- [x] Collapsible folder nodes with indented children
+- [x] Click on a `.json` file → load request into editor
+- [ ] Environment variables: `env.json` in collection root
+- [ ] `{{variable}}` interpolation applied to URL and headers before sending
 
 ## Non-Goals
 
 - No cloud sync or user accounts
-- No GraphQL, gRPC, or WebSockets (v1)
+- No GraphQL, gRPC, or WebSockets (v1/v2)
 - No automatic OAuth2 flows — pass tokens manually in headers
+- No multiple open tabs (v2) — one active request at a time
+- No `.bru` format parsing — JSON collections for now
 
 ## Prerequisites
 
@@ -77,12 +80,12 @@ cargo build --release
 
 ## Dependencies
 
-| Crate             | Purpose                              |
-|-------------------|--------------------------------------|
-| `gpui`            | High-performance native UI framework |
-| `gpui-component`  | Additional GPUI component utilities  |
-| `core-text`       | macOS CoreText bindings              |
-| `reqwest`         | HTTP client (blocking, used in background thread) |
-| `futures`         | `oneshot` channel to bridge thread → async executor |
-| `serde` / `serde_json` | Serialize/deserialize saved requests as JSON   |
-| `dirs`            | Resolve `~/Documents/` cross-platform                |
+| Crate                  | Purpose                                              |
+|------------------------|------------------------------------------------------|
+| `gpui`                 | High-performance native UI framework                 |
+| `gpui-component`       | Additional GPUI component utilities                  |
+| `core-text`            | macOS CoreText bindings                              |
+| `reqwest`              | HTTP client (blocking, used in background thread)    |
+| `futures`              | `oneshot` channel to bridge thread → async executor  |
+| `serde` / `serde_json` | Serialize/deserialize saved requests as JSON         |
+| `dirs`                 | Resolve `~/Documents/` cross-platform                |

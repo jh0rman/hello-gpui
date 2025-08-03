@@ -4,8 +4,8 @@ A fast, lightweight, and native desktop HTTP client built in Rust with [GPUI](ht
 
 ## Status
 
-> **v2.0 — In progress: Collections & Environments**
-> v1 complete. Now building a real file-explorer sidebar, hierarchical collection tree, and `{{variable}}` interpolation via `env.json`.
+> **v2.0 — Complete: Collections & Environments**
+> File-explorer sidebar with collapsible folders, click-to-load requests, and `{{variable}}` interpolation via `env.json`.
 
 ## Architecture
 
@@ -50,8 +50,8 @@ src/
 - [x] Tree node model: `CollectionNode::Folder` / `CollectionNode::Request`
 - [x] Collapsible folder nodes with indented children
 - [x] Click on a `.json` file → load request into editor
-- [ ] Environment variables: `env.json` in collection root
-- [ ] `{{variable}}` interpolation applied to URL and headers before sending
+- [x] Environment variables: `env.json` in collection root
+- [x] `{{variable}}` interpolation applied to URL, headers, and body before sending
 
 ## Non-Goals
 

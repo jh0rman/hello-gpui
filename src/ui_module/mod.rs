@@ -1,7 +1,7 @@
 mod headers_editor;
 mod response_panel;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use gpui::{ClickEvent, Context, Entity, SharedString, Window, div, prelude::*, px, rgb};
@@ -108,6 +108,9 @@ pub struct AppView {
     collection_dir: PathBuf,  // where Save writes new files
     tree: Vec<CollectionNode>,
     expanded: HashSet<PathBuf>,
+
+    // Active environment — loaded from env.json in the current collection folder.
+    active_env: HashMap<String, String>,
 }
 
 impl AppView {
@@ -124,6 +127,7 @@ impl AppView {
         let response_panel = cx.new(|_cx| ResponsePanel::new());
         let collection_dir = storage_module::default_collection_dir();
         let tree = storage_module::load_collection_tree(&storage_module::makako_root_dir());
+        let active_env = storage_module::load_env(&collection_dir);
 
         Self {
             method: HttpMethod::Get,
@@ -134,6 +138,7 @@ impl AppView {
             collection_dir,
             tree,
             expanded: HashSet::new(),
+            active_env,
         }
     }
 
@@ -172,11 +177,22 @@ impl Render for AppView {
 
         // ── Send ─────────────────────────────────────────────────────────────
         let on_send = cx.listener(|this, _: &ClickEvent, _, cx| {
-            let url = this.url_input.read(cx).value().to_string();
+            let env = &this.active_env;
+
+            let url = storage_module::interpolate(
+                &this.url_input.read(cx).value(),
+                env,
+            );
             let method = this.method.label().to_string();
-            let headers = this.headers_editor.read(cx).headers(cx);
+            let headers = this.headers_editor
+                .read(cx)
+                .headers(cx)
+                .into_iter()
+                .map(|(k, v)| (k, storage_module::interpolate(&v, env)))
+                .collect();
             let body = {
-                let b = this.body_input.read(cx).value().to_string();
+                let raw = this.body_input.read(cx).value().to_string();
+                let b = storage_module::interpolate(&raw, env);
                 if b.trim().is_empty() { None } else { Some(b) }
             };
 
@@ -265,6 +281,10 @@ impl Render for AppView {
                         let Ok(req) = storage_module::load_request(&path) else {
                             return;
                         };
+                        // Load the env.json from this request's parent folder.
+                        if let Some(parent) = path.parent() {
+                            this.active_env = storage_module::load_env(parent);
+                        }
                         this.method = HttpMethod::from_str(&req.method);
                         this.url_input.update(cx, |s, cx| s.set_value(req.url, window, cx));
                         this.body_input.update(cx, |s, cx| s.set_value(req.body, window, cx));

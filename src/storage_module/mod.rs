@@ -2,6 +2,7 @@
 // Collections live in ~/Documents/Makako/<collection>/<request>.json.
 // env.json in any directory defines variables for {{interpolation}}.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -98,6 +99,30 @@ pub fn load_collection_tree(root: &Path) -> Vec<CollectionNode> {
     requests.sort_by(|a, b| a.name().cmp(b.name()));
     folders.extend(requests);
     folders
+}
+
+// ── Environment variables ─────────────────────────────────────────────────────
+
+/// Loads `env.json` from `dir`. Returns an empty map if the file doesn't exist
+/// or fails to parse.
+///
+/// Format: a flat JSON object, e.g. `{ "base_url": "https://api.example.com" }`
+pub fn load_env(dir: &Path) -> HashMap<String, String> {
+    let path = dir.join("env.json");
+    let Ok(data) = std::fs::read_to_string(path) else {
+        return HashMap::new();
+    };
+    serde_json::from_str(&data).unwrap_or_default()
+}
+
+/// Replaces every `{{key}}` occurrence in `text` with the matching value from
+/// `env`. Unknown variables are left as-is.
+pub fn interpolate(text: &str, env: &HashMap<String, String>) -> String {
+    let mut result = text.to_string();
+    for (key, value) in env {
+        result = result.replace(&format!("{{{{{}}}}}", key), value);
+    }
+    result
 }
 
 // ── CRUD ───────────────────────────────────────────────────────────────────────

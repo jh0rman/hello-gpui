@@ -12,6 +12,7 @@ use gpui_component::{
 };
 
 use crate::network_module::{self, HttpRequest};
+use crate::snippet_module::{self, SnippetLang};
 use crate::storage_module::{self, CollectionNode, SavedRequest};
 use headers_editor::HeadersEditor;
 use response_panel::ResponsePanel;
@@ -238,6 +239,7 @@ impl Render for AppView {
                 panel.loading = true;
                 panel.response = None;
                 panel.error = None;
+                panel.snippet = None;
                 cx.notify();
             });
 
@@ -301,6 +303,44 @@ impl Render for AppView {
             }
             cx.notify();
         });
+
+        // ── Snippet listeners ─────────────────────────────────────────────────
+        let make_snippet_listener = |lang: SnippetLang| {
+            cx.listener(move |this, _: &ClickEvent, _, cx| {
+                let active = this.active_tab;
+                let env = &this.active_env;
+                let url = storage_module::interpolate(
+                    &this.tabs[active].url_input.read(cx).value(),
+                    env,
+                );
+                let method = this.tabs[active].method.label().to_string();
+                let headers: Vec<(String, String)> = this.tabs[active]
+                    .headers_editor
+                    .read(cx)
+                    .headers(cx)
+                    .into_iter()
+                    .map(|(k, v)| (k, storage_module::interpolate(&v, env)))
+                    .collect();
+                let body_raw = this.tabs[active].body_input.read(cx).value().to_string();
+                let body_interp = storage_module::interpolate(&body_raw, env);
+                let body = if body_interp.trim().is_empty() { None } else { Some(body_interp) };
+
+                let (label, code) = snippet_module::generate(
+                    lang,
+                    &method,
+                    &url,
+                    &headers,
+                    body.as_deref(),
+                );
+                this.tabs[active].response_panel.update(cx, |panel, cx| {
+                    panel.snippet = Some((label, code));
+                    cx.notify();
+                });
+            })
+        };
+        let on_curl = make_snippet_listener(SnippetLang::Curl);
+        let on_js = make_snippet_listener(SnippetLang::Fetch);
+        let on_rs = make_snippet_listener(SnippetLang::Reqwest);
 
         // ── Sidebar listeners ─────────────────────────────────────────────────
         let items = self.visible_sidebar_items();
@@ -536,6 +576,33 @@ impl Render for AppView {
                                     .label("Send")
                                     .primary()
                                     .on_click(on_send),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .gap_1()
+                                    .border_l_1()
+                                    .border_color(rgb(0x2a2a48))
+                                    .pl_2()
+                                    .child(
+                                        Button::new("btn-curl")
+                                            .label("cURL")
+                                            .ghost()
+                                            .on_click(on_curl),
+                                    )
+                                    .child(
+                                        Button::new("btn-js")
+                                            .label("JS")
+                                            .ghost()
+                                            .on_click(on_js),
+                                    )
+                                    .child(
+                                        Button::new("btn-rs")
+                                            .label("RS")
+                                            .ghost()
+                                            .on_click(on_rs),
+                                    ),
                             ),
                     )
                     // ── Headers section ───────────────────────────

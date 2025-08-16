@@ -8,6 +8,7 @@ pub struct ResponsePanel {
     pub loading: bool,
     pub response: Option<HttpResponse>,
     pub error: Option<String>,
+    pub snippet: Option<(String, String)>, // (lang_label, code)
 }
 
 impl ResponsePanel {
@@ -16,6 +17,7 @@ impl ResponsePanel {
             loading: false,
             response: None,
             error: None,
+            snippet: None,
         }
     }
 }
@@ -43,11 +45,37 @@ impl Render for ResponsePanel {
                             .text_sm()
                             .font_weight(FontWeight::BOLD)
                             .text_color(rgb(0x8888aa))
-                            .child("Response"),
+                            .child(if self.snippet.is_some() { "Code Snippet" } else { "Response" }),
                     ),
             )
-            // Panel body — one of: loading / error / response / empty
-            .child(if self.loading {
+            // Panel body — snippet / loading / error / response / empty
+            .child(if let Some((lang, code)) = &self.snippet {
+                div()
+                    .flex_1()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .pt_3()
+                    .child(
+                        div()
+                            .px_2()
+                            .py_1()
+                            .rounded_md()
+                            .bg(rgb(0x1a2a40))
+                            .text_xs()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(rgb(0x6699cc))
+                            .child(lang.clone()),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .text_sm()
+                            .font_family("monospace")
+                            .text_color(rgb(0xaaccee))
+                            .child(code.clone()),
+                    )
+            } else if self.loading {
                 div()
                     .flex_1()
                     .flex()

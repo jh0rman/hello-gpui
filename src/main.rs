@@ -1,4 +1,5 @@
 mod network_module;
+mod snippet_module;
 mod storage_module;
 mod ui_module;
 

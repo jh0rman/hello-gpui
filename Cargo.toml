@@ -1,5 +1,5 @@
 [package]
-name = "hello_gpui"
+name = "makako"
 version = "0.1.0"
 edition = "2024"
 
@@ -14,8 +14,7 @@ serde_json = "1"
 dirs = "5"
 
 [package.metadata.bundle]
-name = "Hello GPUI"
-identifier = "com.jhorman.hellogpui"
+name = "Makako"
+identifier = "com.jh0rman.makako"
 version = "1.0.0"
-copyright = "Copyright Jhorman 2026"
 category = "Productivity"

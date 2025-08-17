@@ -72,11 +72,24 @@ src/
 cargo run
 ```
 
-## Building a release binary
+## Building for macOS
 
+The command `cargo build --release` compiles a standard executable binary which can be found in `target/release/makako`.
+
+However, to create a native macOS application bundle (`.app`) that you can place in your Applications folder and launch like a normal Mac app, you should use `cargo-bundle`.
+
+First, install `cargo-bundle` if you haven't already:
 ```bash
-cargo build --release
+cargo install cargo-bundle
 ```
+
+Then, generate the macOS `.app` bundle:
+```bash
+cargo bundle --release
+```
+
+The compiled application bundle will be available at:
+`target/release/bundle/osx/Makako.app`
 
 ## Dependencies
 
